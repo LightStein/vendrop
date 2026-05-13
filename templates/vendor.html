@@ -1,0 +1,132 @@
+{% extends "_base.html" %}
+{% block title %}Upload — {{ project.name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Upload to <strong>{{ project.name }}</strong></h2>
+  <p class="muted">
+    Files land at
+    <span class="mono">{{ project.nexus_repo }}/{{ project.nexus_path }}&lt;filename&gt;</span>
+    in ANB Nexus.
+    {% if project.allowed_extensions %}
+      Allowed file types: <span class="mono">{{ project.allowed_extensions|map('lower')|join(', ') }}</span>.
+    {% endif %}
+    Max size: <strong>{{ project.max_mb }} MB</strong>.
+  </p>
+
+  <div id="dropzone" style="border: 2px dashed var(--border); border-radius: 8px;
+                            padding: 48px; text-align: center; margin-top: 16px;
+                            background: var(--bg); cursor: pointer;
+                            transition: border-color .15s, background .15s;">
+    <p style="margin: 0 0 12px; font-size: 16px;">
+      Drop files here, or click to choose
+    </p>
+    <p class="muted" style="margin: 0; font-size: 12px;">
+      Multiple files OK — each one uploads on its own.
+    </p>
+    <input id="file-input" type="file" multiple style="display: none;">
+  </div>
+
+  <div id="uploads" style="margin-top: 20px;"></div>
+
+  <p class="muted" style="font-size: 11px; margin-top: 24px;">
+    Filename must be ASCII letters/digits and <span class="mono">._-</span> — no spaces or unicode.
+  </p>
+</div>
+
+<script>
+(function () {
+  const dz       = document.getElementById('dropzone');
+  const input    = document.getElementById('file-input');
+  const uploads  = document.getElementById('uploads');
+  const uploadUrl = {{ ('/u/' ~ project.id ~ '/upload?t=' ~ token) | tojson }};
+
+  function bytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+    return (n/1024/1024).toFixed(1) + ' MB';
+  }
+
+  function row(file) {
+    const r = document.createElement('div');
+    r.style.cssText = 'border: 1px solid var(--border); border-radius: 4px; ' +
+                      'padding: 10px 14px; margin-bottom: 8px; ' +
+                      'background: var(--bg); font-size: 13px;';
+    r.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div class="mono" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${file.name}</div>
+        <div class="muted" style="white-space: nowrap;">${bytes(file.size)}</div>
+      </div>
+      <div class="progress" style="height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden;">
+        <div class="bar" style="height: 100%; width: 0; background: var(--accent); transition: width .1s;"></div>
+      </div>
+      <div class="status muted" style="margin-top: 6px; font-size: 12px;">Queued…</div>
+    `;
+    uploads.prepend(r);
+    return r;
+  }
+
+  function send(file) {
+    const r = row(file);
+    const bar = r.querySelector('.bar');
+    const status = r.querySelector('.status');
+    const xhr = new XMLHttpRequest();
+    const form = new FormData();
+    form.append('file', file);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const pct = (e.loaded / e.total) * 100;
+        bar.style.width = pct + '%';
+        status.textContent = 'Uploading… ' + pct.toFixed(0) + '%';
+      }
+    });
+    xhr.addEventListener('load', () => {
+      let payload = {};
+      try { payload = JSON.parse(xhr.responseText); } catch (e) {}
+      if (xhr.status >= 200 && xhr.status < 300 && payload.ok) {
+        bar.style.background = 'var(--ok)';
+        bar.style.width = '100%';
+        status.innerHTML = '✓ Uploaded · sha256 <span class="mono">' +
+                           (payload.sha256 || '').slice(0, 12) + '…</span> · ' +
+                           (payload.duration_s || '?') + 's';
+        status.style.color = 'var(--ok)';
+      } else {
+        bar.style.background = 'var(--err)';
+        bar.style.width = '100%';
+        status.textContent = '✗ ' + (payload.error || ('HTTP ' + xhr.status));
+        status.style.color = 'var(--err)';
+      }
+    });
+    xhr.addEventListener('error', () => {
+      bar.style.background = 'var(--err)';
+      status.textContent = '✗ network error';
+      status.style.color = 'var(--err)';
+    });
+    xhr.open('POST', uploadUrl);
+    xhr.send(form);
+    status.textContent = 'Uploading…';
+  }
+
+  function handle(files) {
+    for (const f of files) send(f);
+  }
+
+  dz.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => { handle(input.files); input.value = ''; });
+
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dz.style.borderColor = 'var(--accent)';
+    dz.style.background = '#101a2b';
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    dz.style.borderColor = 'var(--border)';
+    dz.style.background = 'var(--bg)';
+  }));
+  dz.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files) handle(e.dataTransfer.files);
+  });
+})();
+</script>
+{% endblock %}

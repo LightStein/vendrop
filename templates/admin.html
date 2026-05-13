@@ -1,0 +1,82 @@
+{% extends "_base.html" %}
+{% block title %}Admin — Nexus Uploader{% endblock %}
+{% block nav %}
+<nav>
+  <a href="{{ url_for('admin_new') }}">+ New project</a>
+  <a href="{{ url_for('logout') }}">Sign out</a>
+</nav>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Projects ({{ projects|length }})</h2>
+  {% if not projects %}
+    <p class="muted">No projects yet. <a href="{{ url_for('admin_new') }}">Create one</a> to give a vendor an upload URL.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Nexus dest</th>
+          <th>Allowed</th>
+          <th>Max</th>
+          <th>Vendor URL</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in projects %}
+        <tr>
+          <td><strong>{{ p.name }}</strong> <span class="pill">{{ p.id }}</span></td>
+          <td class="mono muted">{{ p.nexus_repo }}/{{ p.nexus_path }}</td>
+          <td class="muted">{{ p.allowed_extensions|join(', ') or '(any)' }}</td>
+          <td class="muted">{{ p.max_mb }} MB</td>
+          <td class="mono" style="max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            <a href="{{ public_base }}/u/{{ p.id }}?t={{ p.token }}" target="_blank"
+               title="{{ public_base }}/u/{{ p.id }}?t={{ p.token }}">
+              {{ public_base }}/u/{{ p.id }}?t=…
+            </a>
+          </td>
+          <td><a class="btn secondary" href="{{ url_for('admin_project', pid=p.id) }}">Edit</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent uploads ({{ audit|length }})</h2>
+  {% if not audit %}
+    <p class="muted">No uploads yet.</p>
+  {% else %}
+    <table>
+      <thead>
+        <tr>
+          <th>When (UTC)</th>
+          <th>Project</th>
+          <th>File</th>
+          <th>Size</th>
+          <th>SHA-256</th>
+          <th>From</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in audit %}
+        <tr>
+          <td class="mono muted">{{ e.ts }}</td>
+          <td>{{ e.project_name }}</td>
+          <td class="mono">{{ e.filename }}</td>
+          <td class="muted">{{ '%.1f' % (e.bytes / 1024 / 1024) }} MB</td>
+          <td class="mono muted" title="{{ e.sha256 }}">{{ e.sha256[:12] }}…</td>
+          <td class="muted">{{ e.remote_addr }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+</div>
+
+<p class="muted" style="font-size: 12px;">
+  Nexus target: <span class="mono">{{ nexus_raw_base }}</span>
+</p>
+{% endblock %}

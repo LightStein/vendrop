@@ -1,0 +1,19 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.app_name }}-data
+  labels:
+    {{- include "helm.labels" . | nindent 4 }}
+  annotations:
+    # Don't delete the PVC when ArgoCD prunes — vendor URLs, project config
+    # and the audit log live here. Recreating loses the audit trail.
+    argocd.argoproj.io/sync-options: Prune=false
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+{{- end }}

@@ -1,0 +1,147 @@
+---
+# Vendrop v1.0.0 - Kubernetes/OpenShift Deployment
+#
+# Browser upload tool for vendor archives, constrained to admin-configured
+# Nexus raw repo paths. Admin manages projects + per-project vendor tokens;
+# vendors land on /u/<project>?t=<token> and drag archives in.
+#
+# Apply: oc apply -f deployment.yaml -n devops-tools
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devops-tools
+  labels:
+    team: devops
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vendrop-secrets
+  namespace: devops-tools
+type: Opaque
+stringData:
+  NEXUS_USER: admin
+  NEXUS_PASS: ""              # UPDATE before apply
+  ADMIN_USER: admin
+  ADMIN_PASS: ""              # UPDATE — admin login password
+  SECRET_KEY: ""              # generate with: openssl rand -hex 32
+---
+# PVC so project config + audit log survive pod restarts.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vendrop-data
+  namespace: devops-tools
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vendrop
+  namespace: devops-tools
+  labels:
+    app: vendrop
+    team: devops
+spec:
+  replicas: 1            # single-replica: file-backed projects + audit log
+  strategy:
+    type: Recreate       # avoid two replicas racing on the JSON files
+  selector:
+    matchLabels:
+      app: vendrop
+  template:
+    metadata:
+      labels:
+        app: vendrop
+    spec:
+      containers:
+        - name: app
+          image: registry.nexus.anb.net/devops/vendrop:v1.0.0
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: NEXUS_RAW_BASE
+              value: "https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net"
+            - name: NEXUS_VERIFY_TLS
+              value: "false"        # internal CA, mirror image-copier behaviour
+            - name: DATA_DIR
+              value: "/data"
+            - name: DEFAULT_MAX_MB
+              value: "500"
+            - name: NEXUS_USER
+              valueFrom:
+                secretKeyRef: { name: vendrop-secrets, key: NEXUS_USER }
+            - name: NEXUS_PASS
+              valueFrom:
+                secretKeyRef: { name: vendrop-secrets, key: NEXUS_PASS }
+            - name: ADMIN_USER
+              valueFrom:
+                secretKeyRef: { name: vendrop-secrets, key: ADMIN_USER }
+            - name: ADMIN_PASS
+              valueFrom:
+                secretKeyRef: { name: vendrop-secrets, key: ADMIN_PASS }
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef: { name: vendrop-secrets, key: SECRET_KEY }
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+              ephemeral-storage: "1Gi"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+              ephemeral-storage: "5Gi"
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: vendrop-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vendrop
+  namespace: devops-tools
+  labels:
+    app: vendrop
+spec:
+  selector:
+    app: vendrop
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+---
+# Public Route — edge-terminated TLS via the cluster's wildcard cert.
+# Auth is handled inside the app (admin session for /admin, vendor token in URL for /u).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vendrop
+  namespace: devops-tools
+spec:
+  to:
+    kind: Service
+    name: vendrop
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.app_name }}
+  labels:
+    app: {{ .Values.app_name }}
+spec:
+  {{- if or (eq (include "UseReplicas" .) "true") (eq (include "replicas" .) "0") }}
+  replicas: {{ template "replicas" . }}
+  {{- end }}
+  # Single-replica file-backed state (projects.json + audit.jsonl). Two pods
+  # would race on the JSON writes — Recreate prevents an overlap window.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "helm.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.app_name }}
+      {{- if or (eq .Values.env "prod") (eq .Values.env "drc") }}
+      terminationGracePeriodSeconds: 60
+      {{- end }}
+      containers:
+        - name: api
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.API_PORT }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: "{{ .Values.app_name }}-environment"
+          env:
+            - name: NEXUS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app_name }}-secrets
+                  key: NEXUS_USER
+            - name: NEXUS_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app_name }}-secrets
+                  key: NEXUS_PASS
+            - name: ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app_name }}-secrets
+                  key: ADMIN_USER
+            - name: ADMIN_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app_name }}-secrets
+                  key: ADMIN_PASS
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app_name }}-secrets
+                  key: SECRET_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources: {{ template "resources" . }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.API_PORT }}
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.API_PORT }}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.app_name }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      restartPolicy: Always

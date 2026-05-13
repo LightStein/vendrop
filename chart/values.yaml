@@ -1,0 +1,103 @@
+app_name: vendrop
+replicas: 1
+API_PORT: '8080'
+
+image:
+  registry: registry.nexus.anb.net
+  repository: devops/vendrop
+  tag: v1.0.0
+  pullPolicy: IfNotPresent
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+    ephemeral-storage: 5Gi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+    ephemeral-storage: 1Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+affinity: {}
+
+env: dev
+dev_hostname: apps.devocp.anb.net
+prod_hostname: apps.ocpprod.anb.net
+drc_hostname: apps.ocpdrc.anb.net
+
+# PVC backs /data — holds projects.json + audit.jsonl. Single-replica + Recreate
+# strategy: file-backed state can't tolerate two pods writing the same JSON.
+persistence:
+  enabled: true
+  size: 1Gi
+  accessMode: ReadWriteOnce
+
+# Per-env overrides. `config` is merged into the ConfigMap (envFrom).
+# The Secret named `{{ .Values.app_name }}-secrets` (NEXUS_USER, NEXUS_PASS,
+# ADMIN_USER, ADMIN_PASS, SECRET_KEY) is created manually out-of-band via
+# `oc create secret generic` — not managed by this chart.
+preview:
+  replicas: 0
+  config: []
+
+dev:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+      ephemeral-storage: 5Gi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+      ephemeral-storage: 1Gi
+  config:
+    NEXUS_RAW_BASE: "https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net"
+    NEXUS_VERIFY_TLS: "false"
+    DATA_DIR: "/data"
+    DEFAULT_MAX_MB: "500"
+
+uat:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+      ephemeral-storage: 5Gi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+      ephemeral-storage: 1Gi
+  config:
+    NEXUS_RAW_BASE: "https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net"
+    NEXUS_VERIFY_TLS: "false"
+    DATA_DIR: "/data"
+    DEFAULT_MAX_MB: "500"
+
+prod:
+  replicas: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+      ephemeral-storage: 5Gi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+      ephemeral-storage: 1Gi
+  config:
+    NEXUS_RAW_BASE: "https://nexus.anb.net"
+    NEXUS_VERIFY_TLS: "true"
+    DATA_DIR: "/data"
+    DEFAULT_MAX_MB: "500"
+
+drc:
+  replicas: 0
+  config: []

@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Nexus Uploader{% endblock %}</title>
+  <style>
+    :root {
+      --bg: #0f1115; --panel: #161a22; --border: #262c36;
+      --fg: #e6e6e6; --muted: #8a93a3; --accent: #4f8cff; --accent-fg: #fff;
+      --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px/1.5 -apple-system, system-ui, sans-serif;
+           background: var(--bg); color: var(--fg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    header { background: var(--panel); border-bottom: 1px solid var(--border);
+             padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+    header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+    header .ver { color: var(--muted); font-size: 12px; }
+    header .spacer { flex: 1; }
+    header nav a { margin-left: 16px; color: var(--muted); }
+    header nav a:hover { color: var(--fg); text-decoration: none; }
+    main { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+    .card { background: var(--panel); border: 1px solid var(--border);
+            border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { margin: 0 0 16px; font-size: 15px; }
+    label { display: block; margin-top: 12px; font-size: 12px;
+            color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    input[type=text], input[type=password], input[type=number], textarea {
+      width: 100%; padding: 8px 10px; background: var(--bg);
+      color: var(--fg); border: 1px solid var(--border); border-radius: 4px;
+      font: inherit; margin-top: 4px;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    button, .btn {
+      display: inline-block; padding: 8px 14px; background: var(--accent);
+      color: var(--accent-fg); border: none; border-radius: 4px; cursor: pointer;
+      font: inherit; font-weight: 500; text-decoration: none;
+    }
+    button:hover, .btn:hover { filter: brightness(1.1); text-decoration: none; }
+    button.secondary, .btn.secondary { background: var(--border); color: var(--fg); }
+    button.danger, .btn.danger { background: var(--err); color: #1a0a0a; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: 12px;
+         text-transform: uppercase; letter-spacing: .04em; }
+    .mono { font-family: ui-monospace, SF Mono, Consolas, monospace; font-size: 12px; }
+    .muted { color: var(--muted); }
+    .flash { background: #1e2a1a; border: 1px solid #2f5028; color: var(--ok);
+             padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; }
+    .error { background: #2a1a1a; border: 1px solid #5a2828; color: var(--err);
+             padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
+            font-size: 11px; background: var(--border); color: var(--muted); }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { margin: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Nexus Uploader</h1>
+    <span class="ver">v{{ version }}</span>
+    <span class="spacer"></span>
+    {% block nav %}{% endblock %}
+  </header>
+  <main>
+    {% with messages = get_flashed_messages() %}
+      {% for m in messages %}<div class="flash">{{ m }}</div>{% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

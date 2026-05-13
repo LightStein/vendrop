@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: "{{ .Values.app_name }}-environment"
+  annotations:
+    argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/sync-options: Prune=false
+data:
+  API_PORT: {{ .Values.API_PORT | quote }}
+  {{ if eq .Values.env "dev" }}
+  {{- with .Values.dev }}
+  {{- toYaml .config | nindent 2 }}
+  {{- end }}
+  {{ else if eq .Values.env "uat" }}
+  {{- with .Values.uat }}
+  {{- toYaml .config | nindent 2 }}
+  {{- end }}
+  {{ else if eq .Values.env "prod" }}
+  {{- with .Values.prod }}
+  {{- toYaml .config | nindent 2 }}
+  {{- end }}
+  {{ else if eq .Values.env "drc" }}
+  {{- with .Values.drc }}
+  {{- toYaml .config | nindent 2 }}
+  {{- end }}
+  {{ else if eq .Values.env "preview" }}
+  {{- with .Values.preview }}
+  {{- toYaml .config | nindent 2 }}
+  {{- end }}
+  {{ end }}
