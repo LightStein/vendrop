@@ -1,5 +1,5 @@
 ---
-# Vendrop v1.0.0 - Kubernetes/OpenShift Deployment
+# Vendrop v1.0.4 - Kubernetes/OpenShift Deployment
 #
 # Browser upload tool for vendor archives, constrained to admin-configured
 # Nexus raw repo paths. Admin manages projects + per-project vendor tokens;
@@ -28,13 +28,34 @@ stringData:
   SECRET_KEY: ""              # generate with: openssl rand -hex 32
 ---
 # PVC so project config + audit log survive pod restarts.
+#
+# storageClassName is set explicitly and must stay that way. Without it the
+# claim binds to the cluster default, which on the ANB clusters is `thin` -
+# the in-tree vSphere provisioner. That is the same class behind the nine-day
+# stuck detach in July 2026, where vCenter would not release the volume and
+# the pod could not be rescheduled to another node.
+#
+# CephFS with RWX needs no detach at all, so a node going away costs nothing.
+# vendrop still runs a single replica; RWX is about rescheduling, not scale.
+#
+# NOTE: storageClassName and accessModes are immutable on an existing PVC.
+# An already-deployed vendrop cannot be patched onto the new class - the data
+# has to be copied to a new claim. See MIGRATION-cephfs.md in this directory
+# before applying this file to a namespace where vendrop already runs.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vendrop-data
+  name: vendrop-data-cephfs
   namespace: devops-tools
+  annotations:
+    # Keep the volume if this manifest is ever pruned or reapplied. The vendor
+    # upload tokens live in projects.json on here - losing it invalidates every
+    # link that has been handed out.
+    argocd.argoproj.io/sync-options: Prune=false
+    helm.sh/resource-policy: keep
 spec:
-  accessModes: [ReadWriteOnce]
+  accessModes: [ReadWriteMany]
+  storageClassName: ocs-storagecluster-cephfs
   resources:
     requests:
       storage: 1Gi
@@ -48,6 +69,11 @@ metadata:
     app: vendrop
     team: devops
 spec:
+  # Recreate, not RollingUpdate. vendrop keeps projects.json and audit.jsonl
+  # on the volume; overlapping old and new pods would have two writers on the
+  # same files.
+  strategy:
+    type: Recreate
   replicas: 1            # single-replica: file-backed projects + audit log
   strategy:
     type: Recreate       # avoid two replicas racing on the JSON files
@@ -112,7 +138,7 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: vendrop-data
+            claimName: vendrop-data-cephfs
 ---
 apiVersion: v1
 kind: Service

@@ -37,7 +37,15 @@ drc_hostname: apps.ocpdrc.anb.net
 persistence:
   enabled: true
   size: 1Gi
-  accessMode: ReadWriteOnce
+  # RWX so the volume never has to be detached from a node to move the pod.
+  # vendrop runs a single replica regardless - this is about rescheduling,
+  # not scale. Drop to ReadWriteOnce only if the chosen class has no RWX mode.
+  accessMode: ReadWriteMany
+  # Required - the render fails if this is empty, on purpose. See the comment
+  # in templates/pvc.yaml.
+  #
+  # e.g. ocs-storagecluster-cephfs on OpenShift Data Foundation
+  storageClassName: ""
 
 # Per-env overrides. `config` is merged into the ConfigMap (envFrom).
 # The Secret named `{{ .Values.app_name }}-secrets` (NEXUS_USER, NEXUS_PASS,

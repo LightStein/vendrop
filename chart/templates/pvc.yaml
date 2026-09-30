@@ -1,4 +1,16 @@
+{{/*
+storageClassName is required, not defaulted.
+
+An unset class binds to whatever the cluster default happens to be, and that
+is frequently an in-tree cloud provisioner that has to detach the volume
+before a pod can move nodes. A detach that does not complete pins the pod
+indefinitely - which is how a volume elsewhere in this estate stayed
+undetachable for nine days. Pick a class that needs no detach.
+*/}}
 {{- if .Values.persistence.enabled }}
+{{- if not .Values.persistence.storageClassName }}
+{{- fail "persistence.storageClassName is required. Set it explicitly - do not rely on the cluster default, which is often an in-tree provisioner that needs a volume detach to reschedule a pod. Use a class with no detach (e.g. CephFS or another RWX class)." }}
+{{- end }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -13,6 +25,7 @@ metadata:
 spec:
   accessModes:
     - {{ .Values.persistence.accessMode }}
+  storageClassName: {{ .Values.persistence.storageClassName | quote }}
   resources:
     requests:
       storage: {{ .Values.persistence.size }}

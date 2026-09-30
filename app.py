@@ -43,16 +43,17 @@ from flask import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-VERSION = '1.0.1'
+VERSION = '1.0.4'
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 
-NEXUS_RAW_BASE   = os.environ.get(
-    'NEXUS_RAW_BASE',
-    'https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net',
-).rstrip('/')
+NEXUS_RAW_BASE = os.environ.get('NEXUS_RAW_BASE', '').rstrip('/')
+if not NEXUS_RAW_BASE:
+    raise SystemExit(
+        "NEXUS_RAW_BASE is required (e.g. https://nexus.example.com)"
+    )
 NEXUS_USER       = os.environ.get('NEXUS_USER', 'admin')
 NEXUS_PASS       = os.environ.get('NEXUS_PASS', '')
 NEXUS_VERIFY_TLS = os.environ.get('NEXUS_VERIFY_TLS', 'true').lower() != 'false'
