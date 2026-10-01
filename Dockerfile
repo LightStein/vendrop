@@ -23,9 +23,9 @@ RUN mkdir -p /data && \
 
 EXPOSE 8080
 
-# Configuration via environment variables (see deployment.yaml for the canonical set).
-ENV NEXUS_RAW_BASE=https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net \
-    NEXUS_USER=admin \
+# Configuration via environment variables.
+# NEXUS_RAW_BASE is required at runtime — no default. App refuses to start without it.
+ENV NEXUS_USER=admin \
     NEXUS_PASS= \
     NEXUS_VERIFY_TLS=true \
     ADMIN_USER=admin \
