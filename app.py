@@ -89,9 +89,9 @@ log = logging.getLogger('vendrop')
 @dataclass
 class Project:
     id: str                       # short random id, used as URL slug
-    name: str                     # display name (e.g. "EPS")
+    name: str                     # display name (e.g. "Acme")
     nexus_repo: str               # raw repo name in Nexus (e.g. "raw")
-    nexus_path: str               # path prefix inside repo (e.g. "eps/")
+    nexus_path: str               # path prefix inside repo (e.g. "acme/")
     token: str                    # bearer token for vendor URL
     allowed_extensions: list[str] = field(default_factory=list)  # ["zip","tar","war"]
     max_mb: int = DEFAULT_MAX_MB

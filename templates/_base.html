@@ -3,65 +3,385 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Nexus Uploader{% endblock %}</title>
+  <title>{% block title %}vendrop{% endblock %}</title>
   <style>
     :root {
-      --bg: #0f1115; --panel: #161a22; --border: #262c36;
-      --fg: #e6e6e6; --muted: #8a93a3; --accent: #4f8cff; --accent-fg: #fff;
-      --ok: #34d399; --warn: #fbbf24; --err: #f87171;
+      --bg: #ffffff;
+      --panel: #ffffff;
+      --subtle: #f9fafb;
+      --subtle-2: #f3f4f6;
+      --border: #e5e7eb;
+      --border-strong: #d1d5db;
+      --fg: #0a0a0a;
+      --muted: #6b7280;
+      --muted-strong: #4b5563;
+      --accent: #0a0a0a;
+      --accent-fg: #ffffff;
+      --accent-hover: #1f1f1f;
+      --ok: #15803d;
+      --ok-bg: #f0fdf4;
+      --ok-border: #bbf7d0;
+      --warn: #b45309;
+      --warn-bg: #fffbeb;
+      --warn-border: #fde68a;
+      --warn-dot: #d97706;
+      --err: #b91c1c;
+      --err-bg: #fef2f2;
+      --err-border: #fecaca;
+      --err-dot: #dc2626;
+      --ring: 0 0 0 3px rgba(10,10,10,.08);
+      --shadow-sm: 0 1px 2px rgba(15, 23, 42, .04);
+      --shadow-md: 0 1px 3px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04);
     }
+
     * { box-sizing: border-box; }
-    body { margin: 0; font: 14px/1.5 -apple-system, system-ui, sans-serif;
-           background: var(--bg); color: var(--fg); }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    header { background: var(--panel); border-bottom: 1px solid var(--border);
-             padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
-    header h1 { margin: 0; font-size: 16px; font-weight: 600; }
-    header .ver { color: var(--muted); font-size: 12px; }
+
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Thin brand accent at the very top of the page */
+    body::before {
+      content: "";
+      display: block;
+      height: 2px;
+      background: linear-gradient(90deg, var(--err-dot) 0%, var(--err-dot) 60%, var(--warn-dot) 100%);
+    }
+
+    a {
+      color: var(--fg);
+      text-decoration: underline;
+      text-decoration-color: var(--border-strong);
+      text-underline-offset: 3px;
+      transition: text-decoration-color .15s, color .15s;
+    }
+    a:hover { text-decoration-color: var(--fg); }
+
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header .brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--fg);
+    }
+    header .brand .mark {
+      width: 22px; height: 22px; border-radius: 5px;
+      background: var(--fg);
+      color: var(--accent-fg);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; letter-spacing: .02em;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    header .ver {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px;
+      background: var(--subtle);
+      border: 1px solid var(--border);
+      color: var(--muted-strong);
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 999px;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    }
+    header .env-tag {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 10px;
+      background: var(--subtle);
+      border: 1px solid var(--border);
+      color: var(--muted-strong);
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 999px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    header .env-tag::before {
+      content: "";
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--ok);
+    }
     header .spacer { flex: 1; }
-    header nav a { margin-left: 16px; color: var(--muted); }
-    header nav a:hover { color: var(--fg); text-decoration: none; }
-    main { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
-    .card { background: var(--panel); border: 1px solid var(--border);
-            border-radius: 8px; padding: 20px; margin-bottom: 16px; }
-    .card h2 { margin: 0 0 16px; font-size: 15px; }
-    label { display: block; margin-top: 12px; font-size: 12px;
-            color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    header nav { display: flex; gap: 4px; }
+    header nav a {
+      padding: 6px 10px;
+      color: var(--muted-strong);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 5px;
+      transition: background .15s, color .15s;
+    }
+    header nav a:hover { color: var(--fg); background: var(--subtle); }
+
+    main {
+      flex: 1;
+      max-width: 1120px;
+      width: 100%;
+      margin: 32px auto 0;
+      padding: 0 28px 64px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
+    }
+    .card > h2:first-child { margin-top: 0; }
+    .card h2 {
+      margin: 0 0 18px;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .eyebrow {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    label {
+      display: block;
+      margin-top: 14px;
+      font-size: 11px;
+      color: var(--muted-strong);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      font-weight: 600;
+    }
     input[type=text], input[type=password], input[type=number], textarea {
-      width: 100%; padding: 8px 10px; background: var(--bg);
-      color: var(--fg); border: 1px solid var(--border); border-radius: 4px;
-      font: inherit; margin-top: 4px;
+      width: 100%;
+      padding: 9px 11px;
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      font: inherit;
+      margin-top: 6px;
+      transition: border-color .15s, box-shadow .15s;
     }
-    input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    input:hover, textarea:hover { border-color: var(--muted); }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--fg);
+      box-shadow: var(--ring);
+    }
+    small.muted {
+      display: block;
+      margin-top: 6px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
     button, .btn {
-      display: inline-block; padding: 8px 14px; background: var(--accent);
-      color: var(--accent-fg); border: none; border-radius: 4px; cursor: pointer;
-      font: inherit; font-weight: 500; text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--accent);
+      color: var(--accent-fg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background .15s, border-color .15s, color .15s, transform .04s;
     }
-    button:hover, .btn:hover { filter: brightness(1.1); text-decoration: none; }
-    button.secondary, .btn.secondary { background: var(--border); color: var(--fg); }
-    button.danger, .btn.danger { background: var(--err); color: #1a0a0a; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-    th { color: var(--muted); font-weight: 500; font-size: 12px;
-         text-transform: uppercase; letter-spacing: .04em; }
-    .mono { font-family: ui-monospace, SF Mono, Consolas, monospace; font-size: 12px; }
+    button:hover, .btn:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      text-decoration: none;
+    }
+    button:active, .btn:active { transform: translateY(1px); }
+
+    button.secondary, .btn.secondary {
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border-strong);
+    }
+    button.secondary:hover, .btn.secondary:hover {
+      background: var(--subtle);
+      border-color: var(--fg);
+      color: var(--fg);
+    }
+
+    button.danger, .btn.danger {
+      background: var(--bg);
+      color: var(--err);
+      border: 1px solid var(--err-border);
+    }
+    button.danger:hover, .btn.danger:hover {
+      background: var(--err);
+      border-color: var(--err);
+      color: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+    th, td {
+      text-align: left;
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      background: var(--subtle);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:hover { background: var(--subtle); }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .mono {
+      font-family: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace;
+      font-size: 12.5px;
+    }
     .muted { color: var(--muted); }
-    .flash { background: #1e2a1a; border: 1px solid #2f5028; color: var(--ok);
-             padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; }
-    .error { background: #2a1a1a; border: 1px solid #5a2828; color: var(--err);
-             padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; }
-    .pill { display: inline-block; padding: 2px 8px; border-radius: 999px;
-            font-size: 11px; background: var(--border); color: var(--muted); }
-    .row { display: flex; gap: 8px; align-items: center; }
+
+    .flash, .error {
+      padding: 11px 14px;
+      border-radius: 6px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .flash {
+      background: var(--ok-bg);
+      border: 1px solid var(--ok-border);
+      color: var(--ok);
+    }
+    .flash::before {
+      content: ""; flex: 0 0 auto;
+      width: 8px; height: 8px; margin-top: 6px;
+      border-radius: 50%; background: var(--ok);
+    }
+    .error {
+      background: var(--err-bg);
+      border: 1px solid var(--err-border);
+      color: var(--err);
+    }
+    .error::before {
+      content: ""; flex: 0 0 auto;
+      width: 8px; height: 8px; margin-top: 6px;
+      border-radius: 50%; background: var(--err-dot);
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--subtle);
+      color: var(--muted-strong);
+      border: 1px solid var(--border);
+    }
+    .pill.ok    { background: var(--ok-bg);   color: var(--ok);   border-color: var(--ok-border); }
+    .pill.warn  { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-border); }
+    .pill.err   { background: var(--err-bg);  color: var(--err);  border-color: var(--err-border); }
+    .pill.dot::before {
+      content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+    }
+
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .row > * { margin: 0; }
+    .stack-12 > * + * { margin-top: 12px; }
+    .stack-20 > * + * { margin-top: 20px; }
+
+    .empty {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      background: var(--subtle);
+      border: 1px dashed var(--border-strong);
+      border-radius: 8px;
+    }
+
+    footer {
+      max-width: 1120px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 22px 28px 28px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    footer .sep { opacity: .5; }
+    footer .brand-foot { display: inline-flex; align-items: center; gap: 6px; color: var(--muted-strong); font-weight: 500; }
+    footer .spacer { flex: 1; }
+    footer .by {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    footer .by .deltaops-logo {
+      height: 14px;
+      width: auto;
+      color: var(--muted-strong);
+      display: inline-block;
+      vertical-align: middle;
+      transition: color .15s;
+    }
+    footer .by:hover .deltaops-logo { color: var(--fg); }
+
+    @media (max-width: 720px) {
+      header { padding: 12px 16px; gap: 10px; }
+      header .env-tag { display: none; }
+      main { padding: 0 16px 48px; margin-top: 20px; }
+      .card { padding: 18px; border-radius: 8px; }
+      footer { padding: 18px 16px 22px; flex-wrap: wrap; }
+    }
   </style>
 </head>
 <body>
   <header>
-    <h1>Nexus Uploader</h1>
+    <a class="brand" href="/">
+      <span class="mark">V</span>
+      <h1>vendrop</h1>
+    </a>
     <span class="ver">v{{ version }}</span>
+    <span class="env-tag">Internal</span>
     <span class="spacer"></span>
     {% block nav %}{% endblock %}
   </header>
@@ -71,5 +391,20 @@
     {% endwith %}
     {% block content %}{% endblock %}
   </main>
+  <footer>
+    <span class="brand-foot">{% block footer_brand %}vendrop{% endblock %}</span>
+    <span class="sep">·</span>
+    <span>Internal use only</span>
+    <span class="spacer"></span>
+    {% block footer_right %}
+    <span class="by">
+      <span>Open source &middot; Built by</span>
+      <svg class="deltaops-logo" viewBox="0 0 194 49" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="DeltaOps">
+        <path fill="currentColor" d="M81.1105 25.3037C81.1105 27.0136 80.8328 28.5776 80.2772 29.999C79.7218 31.4092 78.9365 32.6223 77.9215 33.6366C76.9174 34.651 75.7048 35.4426 74.2839 36.0083C72.8737 36.5644 71.3033 36.8416 69.5726 36.8416H60.8551V13.7659H69.5726C71.3033 13.7659 72.8737 14.0495 74.2839 14.6152C75.7048 15.1713 76.9174 15.9565 77.9215 16.9708C78.9365 17.9852 79.7218 19.2031 80.2772 20.6245C80.8328 22.0347 81.1105 23.5939 81.1105 25.3037ZM77.2805 25.3037C77.2805 23.9785 77.099 22.7878 76.7357 21.7302C76.3831 20.6726 75.8704 19.78 75.1973 19.0541C74.535 18.3281 73.7285 17.7721 72.7776 17.3875C71.8268 16.9917 70.7584 16.7946 69.5726 16.7946H64.6209V33.8129H69.5726C70.7584 33.8129 71.8268 33.6206 72.7776 33.236C73.7285 32.8514 74.535 32.2954 75.1973 31.5694C75.8704 30.8323 76.3831 29.9397 76.7357 28.8933C77.099 27.8357 77.2805 26.6386 77.2805 25.3037ZM95.4979 26.8261C95.4979 26.2492 95.4123 25.7156 95.2415 25.2236C95.0812 24.722 94.8408 24.2894 94.5203 23.9256C94.1998 23.5522 93.7992 23.2638 93.3185 23.0603C92.8483 22.8471 92.3035 22.7398 91.6839 22.7398C90.434 22.7398 89.4511 23.0971 88.7354 23.8134C88.0196 24.5297 87.5656 25.5329 87.3733 26.8261H95.4979ZM87.2771 28.9414C87.3198 29.8708 87.464 30.6769 87.7098 31.3611C87.9555 32.0342 88.2812 32.595 88.6873 33.0437C89.104 33.4924 89.5953 33.8289 90.1616 34.0533C90.7385 34.2664 91.3795 34.3738 92.0846 34.3738C92.7576 34.3738 93.3398 34.2985 93.8313 34.1494C94.3226 33.9892 94.75 33.8177 95.1133 33.6366C95.4764 33.4443 95.7863 33.2729 96.0427 33.1238C96.2991 32.9636 96.534 32.8835 96.7478 32.8835C97.0255 32.8835 97.2391 32.9908 97.3888 33.204L98.3663 34.4699C97.9602 34.9507 97.501 35.3561 96.9882 35.6878C96.4754 36.0195 95.9305 36.292 95.3536 36.5051C94.7767 36.7086 94.1838 36.8528 93.5749 36.9377C92.9659 37.0339 92.373 37.082 91.7961 37.082C90.6637 37.082 89.6113 36.8945 88.6392 36.5211C87.6777 36.1365 86.839 35.5756 86.1233 34.8385C85.4183 34.1014 84.8627 33.1879 84.4568 32.0983C84.0614 31.0086 83.8638 29.7538 83.8638 28.3324C83.8638 27.1995 84.0401 26.1418 84.3927 25.1595C84.7558 24.1772 85.2686 23.3215 85.931 22.5955C86.6041 21.8696 87.4159 21.2975 88.3668 20.8809C89.3283 20.453 90.4125 20.2399 91.6199 20.2399C92.624 20.2399 93.5534 20.4049 94.4082 20.7367C95.2628 21.0572 95.9999 21.5331 96.6196 22.1629C97.2391 22.7927 97.7199 23.5683 98.0618 24.4865C98.4144 25.3951 98.5906 26.4303 98.5906 27.5953C98.5906 28.1289 98.5318 28.4879 98.4144 28.6689C98.2967 28.85 98.0831 28.9414 97.7734 28.9414H87.2771ZM105.714 13.1249V36.8416H102.268V13.1249H105.714ZM115.607 37.098C114.25 37.098 113.203 36.7182 112.466 35.9602C111.74 35.191 111.376 34.1126 111.376 32.7232V23.2045H109.582C109.389 23.2045 109.224 23.1452 109.085 23.0282C108.946 22.9 108.876 22.7125 108.876 22.4674V21.0732L111.521 20.6886L112.274 15.9613C112.327 15.7802 112.418 15.636 112.546 15.5286C112.674 15.4116 112.845 15.3523 113.059 15.3523H114.822V20.7206H119.357V23.2045H114.822V32.4829C114.822 33.071 114.966 33.5196 115.254 33.8289C115.543 34.1382 115.927 34.2936 116.408 34.2936C116.675 34.2936 116.905 34.2616 117.097 34.1975C117.29 34.1222 117.455 34.0485 117.594 33.9732C117.733 33.8882 117.85 33.8129 117.947 33.7488C118.053 33.6735 118.155 33.6366 118.251 33.6366C118.443 33.6366 118.598 33.744 118.716 33.9571L119.741 35.6397C119.207 36.1093 118.577 36.473 117.85 36.7294C117.124 36.9746 116.376 37.098 115.607 37.098ZM131.207 29.6945C129.978 29.7378 128.942 29.8388 128.098 29.999C127.254 30.148 126.57 30.3467 126.047 30.5919C125.523 30.8275 125.144 31.1095 124.909 31.4412C124.684 31.773 124.572 32.1351 124.572 32.5309C124.572 32.9155 124.631 33.2472 124.749 33.5245C124.877 33.7921 125.048 34.0164 125.261 34.1975C125.486 34.369 125.742 34.4972 126.031 34.5821C126.33 34.6574 126.656 34.6943 127.008 34.6943C127.905 34.6943 128.675 34.5292 129.316 34.1975C129.967 33.8562 130.598 33.3642 131.207 32.7232V29.6945ZM122.072 22.7718C123.921 21.0523 126.121 20.1918 128.675 20.1918C129.615 20.1918 130.448 20.3473 131.175 20.6565C131.912 20.9562 132.526 21.3825 133.017 21.9385C133.519 22.4946 133.899 23.1564 134.155 23.9256C134.422 24.6836 134.556 25.5281 134.556 26.4575V36.8416H133.017C132.686 36.8416 132.435 36.7935 132.264 36.6974C132.093 36.59 131.949 36.3817 131.832 36.0724L131.495 34.7424C131.078 35.1157 130.667 35.4522 130.261 35.7519C129.855 36.0403 129.433 36.2855 128.995 36.4891C128.568 36.6926 128.103 36.8416 127.601 36.9377C127.11 37.0451 126.565 37.098 125.966 37.098C125.304 37.098 124.684 37.0067 124.108 36.8256C123.541 36.6445 123.05 36.3721 122.633 36.0083C122.217 35.6349 121.885 35.175 121.64 34.6302C121.405 34.0853 121.287 33.4443 121.287 32.7072C121.287 32.0774 121.453 31.4621 121.784 30.8643C122.126 30.2666 122.681 29.7314 123.451 29.2619C124.231 28.7811 125.251 28.3853 126.511 28.076C127.783 27.7668 129.348 27.5905 131.207 27.5472V26.4575C131.207 25.2829 130.955 24.4064 130.453 23.8295C129.951 23.2526 129.214 22.9641 128.242 22.9641C127.58 22.9641 127.024 23.049 126.575 23.2205C126.127 23.3808 125.737 23.557 125.406 23.7493C125.074 23.9416 124.781 24.1227 124.524 24.2942C124.268 24.4544 123.995 24.5345 123.707 24.5345C123.472 24.5345 123.269 24.4752 123.098 24.3583C122.938 24.2301 122.804 24.0746 122.697 23.8935L122.072 22.7718ZM161.002 25.3037C161.002 27.0136 160.724 28.5888 160.169 30.0311C159.613 31.4733 158.828 32.7184 157.813 33.7648C156.809 34.8016 155.596 35.6125 154.175 36.2006C152.765 36.7887 151.195 37.082 149.464 37.082C147.744 37.082 146.174 36.7887 144.753 36.2006C143.343 35.6125 142.13 34.8016 141.115 33.7648C140.1 32.7184 139.315 31.4733 138.76 30.0311C138.204 28.5888 137.926 27.0136 137.926 25.3037C137.926 23.5939 138.204 22.0186 138.76 20.5764C139.315 19.1342 140.1 17.889 141.115 16.8426C142.13 15.7962 143.343 14.979 144.753 14.3908C146.174 13.8027 147.744 13.5095 149.464 13.5095C151.195 13.5095 152.765 13.8027 154.175 14.3908C155.596 14.979 156.809 15.7962 157.813 16.8426C158.828 17.889 159.613 19.1342 160.169 20.5764C160.724 22.0186 161.002 23.5939 161.002 25.3037ZM157.172 25.3037C157.172 23.9785 156.99 22.7878 156.627 21.7302C156.275 20.6726 155.762 19.7752 155.089 19.038C154.426 18.3009 153.62 17.7352 152.669 17.3394C151.718 16.9436 150.65 16.7465 149.464 16.7465C148.289 16.7465 147.226 16.9436 146.275 17.3394C145.324 17.7352 144.512 18.3009 143.839 19.038C143.166 19.7752 142.648 20.6726 142.285 21.7302C141.922 22.7878 141.74 23.9785 141.74 25.3037C141.74 26.6386 141.922 27.8357 142.285 28.8933C142.648 29.9509 143.166 30.8483 143.839 31.5855C144.512 32.3114 145.324 32.8722 146.275 33.2681C147.226 33.6527 148.289 33.845 149.464 33.845C150.65 33.845 151.718 33.6527 152.669 33.2681C153.62 32.8722 154.426 32.3114 155.089 31.5855C155.762 30.8483 156.275 29.9509 156.627 28.8933C156.99 27.8357 157.172 26.6386 157.172 25.3037ZM168.034 32.7393C168.515 33.3594 169.037 33.7969 169.605 34.0533C170.181 34.2985 170.816 34.4219 171.512 34.4219C172.858 34.4219 173.904 33.9299 174.652 32.9476C175.41 31.9652 175.79 30.5006 175.79 28.5568C175.79 27.552 175.704 26.6979 175.534 25.9928C175.362 25.2765 175.117 24.6948 174.797 24.2461C174.476 23.7974 174.085 23.4721 173.627 23.2686C173.167 23.0651 172.649 22.9641 172.072 22.9641C171.196 22.9641 170.438 23.1564 169.797 23.541C169.166 23.9144 168.579 24.4544 168.034 25.1595V32.7393ZM167.858 22.868C168.541 22.0667 169.316 21.4209 170.181 20.929C171.056 20.437 172.072 20.1918 173.226 20.1918C174.144 20.1918 174.978 20.3793 175.726 20.7527C176.473 21.1164 177.114 21.6501 177.649 22.3552C178.183 23.0603 178.595 23.9368 178.883 24.9832C179.181 26.02 179.332 27.2107 179.332 28.5568C179.332 29.7634 179.165 30.8916 178.835 31.938C178.514 32.9748 178.05 33.877 177.441 34.6462C176.832 35.4042 176.095 36.0035 175.229 36.441C174.364 36.8688 173.386 37.082 172.297 37.082C171.335 37.082 170.518 36.9265 169.845 36.6172C169.182 36.308 168.579 35.8801 168.034 35.3353V42.274H164.589V20.4963H166.672C167.142 20.4963 167.441 20.7158 167.569 21.1533L167.858 22.868ZM192.839 23.4609C192.752 23.6099 192.656 23.7173 192.551 23.7814C192.443 23.8455 192.31 23.8775 192.15 23.8775C191.967 23.8775 191.77 23.8246 191.557 23.7173C191.342 23.6003 191.092 23.4721 190.804 23.3327C190.515 23.1933 190.172 23.0715 189.778 22.9641C189.394 22.8471 188.939 22.7878 188.416 22.7878C187.988 22.7878 187.599 22.8407 187.246 22.9481C186.903 23.0442 186.61 23.1885 186.365 23.3808C186.129 23.5618 185.948 23.7814 185.82 24.0378C185.692 24.2829 185.628 24.5506 185.628 24.839C185.628 25.2236 185.745 25.5441 185.98 25.8005C186.214 26.0569 186.525 26.2813 186.91 26.4736C187.294 26.6546 187.732 26.8213 188.224 26.9703C188.714 27.1193 189.217 27.2796 189.73 27.4511C190.243 27.6225 190.745 27.8196 191.236 28.044C191.727 28.2683 192.166 28.5456 192.551 28.8773C192.935 29.1978 193.244 29.5936 193.48 30.0631C193.714 30.523 193.833 31.0839 193.833 31.7457C193.833 32.5149 193.693 33.2248 193.416 33.877C193.137 34.5292 192.732 35.0949 192.198 35.5756C191.663 36.0564 190.996 36.4298 190.195 36.6974C189.403 36.965 188.496 37.098 187.471 37.098C186.903 37.098 186.354 37.0451 185.82 36.9377C185.296 36.8416 184.795 36.7086 184.314 36.5371C183.843 36.356 183.4 36.1413 182.984 35.8961C182.577 35.6509 182.215 35.3833 181.894 35.0949L182.695 33.7809C182.791 33.6206 182.908 33.4972 183.048 33.4123C183.197 33.3161 183.378 33.2681 183.593 33.2681C183.817 33.2681 184.035 33.3434 184.25 33.4924C184.474 33.6318 184.73 33.7857 185.019 33.9571C185.317 34.1286 185.676 34.2888 186.093 34.4379C186.509 34.5773 187.027 34.6462 187.647 34.6462C188.16 34.6462 188.602 34.5869 188.977 34.4699C189.35 34.3417 189.66 34.1703 189.906 33.9571C190.152 33.744 190.333 33.5036 190.451 33.236C190.568 32.9588 190.628 32.6639 190.628 32.3547C190.628 31.938 190.509 31.5967 190.275 31.3291C190.039 31.0614 189.724 30.8323 189.33 30.64C188.945 30.4477 188.501 30.2762 187.999 30.1272C187.508 29.9782 187.006 29.8179 186.493 29.6465C185.98 29.475 185.472 29.2779 184.971 29.0535C184.479 28.8292 184.035 28.5455 183.641 28.2042C183.256 27.8517 182.945 27.4302 182.711 26.9383C182.476 26.4367 182.359 25.8278 182.359 25.1114C182.359 24.4592 182.487 23.8407 182.743 23.2526C183.009 22.6644 183.394 22.1468 183.897 21.6982C184.41 21.2495 185.035 20.8969 185.772 20.6405C186.519 20.3729 187.379 20.2399 188.352 20.2399C189.451 20.2399 190.451 20.4162 191.349 20.7687C192.246 21.1213 192.999 21.602 193.608 22.2109L192.839 23.4609Z"/>
+        <path fill="currentColor" d="M23.2798 3.84714C23.2802 0.426538 27.4164 -1.28622 29.8354 1.13229L47.687 18.9839C50.106 21.4029 48.3931 25.5393 44.9721 25.5395H36.1499C35.5263 25.5394 35.02 25.0333 35.02 24.4096C35.0202 23.7861 35.5264 23.2799 36.1499 23.2798H44.9721C46.3807 23.2796 47.0864 21.5766 46.0903 20.5805L28.2387 2.72897C27.2427 1.73346 25.54 2.43897 25.5395 3.84714V44.9721C25.5393 48.3931 21.4029 50.106 18.9839 47.687L1.1323 29.8354C-1.28622 27.4164 0.42653 23.2802 3.84714 23.2798H12.646C13.2696 23.2798 13.7757 23.786 13.7759 24.4096C13.7758 25.0334 13.2697 25.5395 12.646 25.5395H3.84714C2.43896 25.5399 1.73346 27.2427 2.72898 28.2387L20.5805 46.0903C21.5766 47.0863 23.2796 46.3807 23.2798 44.9721V3.84714ZM21.2475 27.1206C21.4969 27.1206 21.6987 27.3233 21.6987 27.5727V43.7397C21.6983 44.1417 21.2128 44.3431 20.9282 44.0591L4.7612 27.8921C4.47659 27.6074 4.6781 27.1206 5.08054 27.1206H21.2475ZM27.1206 5.08053C27.1206 4.6781 27.6074 4.47659 27.8921 4.7612L44.0581 20.9282C44.3427 21.2128 44.1412 21.6997 43.7387 21.6997H27.5718C27.3225 21.6995 27.1206 21.4969 27.1206 21.2475V5.08053Z"/>
+      </svg>
+    </span>
+    {% endblock %}
+  </footer>
 </body>
 </html>

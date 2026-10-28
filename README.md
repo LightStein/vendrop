@@ -1,8 +1,8 @@
 # Vendrop
 
-Browser-based upload tool that lets vendors drop archives into ANB Nexus
-without giving them Nexus credentials, console access, or visibility into
-anyone else's path. Admin (DevOps) defines the project and Nexus path;
+Browser-based upload tool that lets vendors drop archives into a Nexus raw
+repository without giving them Nexus credentials, console access, or visibility into
+anyone else's path. An admin defines the project and Nexus path;
 vendor gets a tokenised URL and a drag-and-drop page.
 
 The problem this solves: vendors hand-deliver builds (WAR, ZIP, tarballs)
@@ -16,7 +16,7 @@ API: admin-curated paths in, vendor uploads out, full audit trail.
 ## Architecture
 
 ```
-   vendor browser                 vendrop pod (dev-devops-tools)         Nexus raw
+   vendor browser                 vendrop pod                            Nexus raw
    ┌────────────┐   HTTPS    ┌───────────────────────────────┐  HTTPS  ┌──────────┐
    │ /u/<pid>?t │─────────▶  │ Flask + Werkzeug ProxyFix      │ ──────▶ │  /repo/  │
    │            │            │  • token check                  │   PUT   │  <path>/ │
@@ -24,7 +24,7 @@ API: admin-curated paths in, vendor uploads out, full audit trail.
    └────────────┘            │  • stream PUT to Nexus          │         └──────────┘
                              │  • append audit.jsonl           │
                              │                                 │
-                             │  /data  ──▶ PVC (RWO, 1Gi)      │
+                             │  /data  ──▶ PVC (RWX, 1Gi)      │
                              │    projects.json (state)        │
                              │    audit.jsonl  (history)       │
                              └───────────────────────────────┘
@@ -52,8 +52,7 @@ enforced in the streaming loop and aborts mid-upload if exceeded.
 | `templates/`                      | Jinja2 — login, admin dashboard, project form, drop  |
 | `requirements.txt`                | `flask`, `requests`                                  |
 | `Dockerfile`                      | `python:3.11-alpine`, OCP random-UID safe            |
-| `deployment.yaml`                 | Standalone manifest (reference / non-GitOps)         |
-| `STATUS.md`                       | Current deployment state                             |
+| `deployment.yaml`                 | Standalone manifest, no Helm needed                  |
 | `chart/`                          | Helm chart (canonical deploy)                        |
 | `chart/values.yaml`               | Per-env image / config / resources                   |
 
@@ -67,8 +66,8 @@ block (rendered into a `ConfigMap`); secrets come from a `vendrop-secrets`
 
 | Variable           | Source     | Default                                                          | Notes |
 | ------------------ | ---------- | ---------------------------------------------------------------- | ----- |
-| `NEXUS_RAW_BASE`   | ConfigMap  | `https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net`      | Trailing slash stripped |
-| `NEXUS_VERIFY_TLS` | ConfigMap  | `true`                                                           | `false` in DEV (self-signed) |
+| `NEXUS_RAW_BASE`   | ConfigMap  | **required**, e.g. `https://nexus.example.com`                   | Trailing slash stripped; the app will not start without it |
+| `NEXUS_VERIFY_TLS` | ConfigMap  | `true`                                                           | `false` only for a self-signed Nexus |
 | `DATA_DIR`         | ConfigMap  | `/data`                                                          | PVC mount point |
 | `DEFAULT_MAX_MB`   | ConfigMap  | `500`                                                            | Per-project cap on new projects |
 | `MAX_AUDIT_DISPLAY`| ConfigMap  | `200`                                                            | Audit lines shown in dashboard |
@@ -96,59 +95,73 @@ block (rendered into a `ConfigMap`); secrets come from a `vendrop-secrets`
 
 ---
 
-## Deploy (canonical, GitOps)
+## Deploy
 
-Helm chart is at `chart/`. Wire it to your namespace via the GitOps tool
-of your choice (e.g. ArgoCD `Application` pointing `path: chart` at this
-repo). ANB runs it under `dev-devops-tools`.
+The published image is `docker.io/nautilus444/vendrop` (MIT, built from this
+repo). Mirror it into your own registry if the cluster cannot reach Docker Hub.
+
+### Helm (recommended)
+
+The chart is in `chart/`. Two values have no default and the render fails
+without them, on purpose:
+
+- `persistence.storageClassName` - an RWX class that needs no volume detach
+  (CephFS, NFS, ...). Left to the cluster default, an in-tree provisioner can
+  pin the pod to a node when a detach hangs.
+- `<env>.config.NEXUS_RAW_BASE` - where every upload goes.
 
 ```bash
-# 1. Create the namespace (one-off, requires cluster-admin)
-oc apply -f outgoing/dev-devops-tools.yml
+kubectl create namespace vendrop
 
-# 2. Create the secret (one-off, out-of-band; never in Git)
-oc create secret generic vendrop-secrets -n dev-devops-tools \
-  --from-literal=NEXUS_USER=admin \
-  --from-literal=NEXUS_PASS='<nexus password>' \
+kubectl create secret generic vendrop-secrets -n vendrop \
+  --from-literal=NEXUS_USER='<nexus user that may write the raw repos>' \
+  --from-literal=NEXUS_PASS='<password>' \
   --from-literal=ADMIN_USER=admin \
-  --from-literal=ADMIN_PASS='<choose one>' \
+  --from-literal=ADMIN_PASS='<admin UI password>' \
   --from-literal=SECRET_KEY="$(openssl rand -hex 32)"
 
-# 3. Push the chart + ArgoCD Application via the GitOps zip workflow
-#    (gateway ships outgoing/vendrop-gitops.zip + COMMIT_MESSAGES.txt)
-#    Once merged, ArgoCD syncs.
-
-# 4. Find the URL
-oc get route vendrop -n dev-devops-tools
-# → https://vendrop.apps.devocp.anb.net
+helm install vendrop ./chart -n vendrop \
+  --set env=dev \
+  --set dev_hostname=apps.example.com \
+  --set dev.config.NEXUS_RAW_BASE=https://nexus.example.com \
+  --set persistence.storageClassName=<your-rwx-class>
 ```
 
-The chart's Route ships `tls.termination: edge` + `insecureEdgeTerminationPolicy: Redirect`.
-The Flask app has `ProxyFix` wired up so `request.host_url` returns `https://` —
-that means generated vendor links land on HTTPS directly and don't trip
-the redirect mid-flight.
+`env` selects one of the per-env blocks in `values.yaml` (preview, dev, uat,
+prod, drc), which is handy for a GitOps repo that renders one release per
+environment. For a single install, `dev` is fine.
 
-### Rolling a new image
+The chart ships an OpenShift `Route` with `tls.termination: edge` and
+`insecureEdgeTerminationPolicy: Redirect`. The app has `ProxyFix` wired, so
+`request.host_url` returns `https://` and generated vendor links land on HTTPS
+directly. On plain Kubernetes, put an Ingress in front of the `vendrop`
+Service instead.
+
+### Without Helm
+
+`deployment.yaml` is a standalone manifest. Fill in every value marked
+`CHANGE-ME`, then `kubectl apply -f deployment.yaml`.
+
+### Building
 
 ```bash
-# Local build (Docker Hub during bootstrap; Nexus once mirrored)
-docker build -t nautilus444/vendrop:vX.Y.Z .
-docker push  nautilus444/vendrop:vX.Y.Z
-
-# Bump image.tag in envs/<env>/templates/<env>-vendrop.yaml
-# Push via the GitOps zip workflow → ArgoCD rolls the Deployment
+docker build -t <registry>/vendrop:vX.Y.Z .
+docker push  <registry>/vendrop:vX.Y.Z
 ```
+
+Runs as an arbitrary UID in group 0, so it works under OpenShift's
+`restricted` SCC as well as on plain Kubernetes.
 
 ---
 
 ## Admin guide
 
-1. Open the Route (`https://vendrop.apps.devocp.anb.net`).
+1. Open the Route or Ingress URL.
 2. Sign in with `ADMIN_USER` / `ADMIN_PASS` (from the `vendrop-secrets`).
 3. **Create project** — `/admin/new`. Fields:
-   - **Name**: display only (e.g. "EPS").
+   - **Name**: display only (e.g. "Acme").
    - **Nexus repo**: existing raw repo name (e.g. `raw`).
-   - **Path prefix**: where uploads land inside the repo (e.g. `eps/`).
+   - **Path prefix**: where uploads land inside the repo (e.g. `acme/`).
      Must end with `/`; `..` is rejected at save time.
    - **Allowed extensions**: comma-separated, blank = any. (e.g. `zip,war,tar`).
    - **Max size (MB)**: per-file cap.
@@ -164,7 +177,7 @@ docker push  nautilus444/vendrop:vX.Y.Z
 
 ## Vendor guide
 
-Vendor receives a URL like `https://vendrop.apps.devocp.anb.net/u/abc123?t=...`.
+Vendor receives a URL like `https://vendrop.example.com/u/abc123?t=...`.
 They open it, drag a file onto the page, wait for the green tick.
 Failures show the reason inline (wrong extension, too big, Nexus 4xx/5xx).
 That is the entire vendor-facing surface.
@@ -178,16 +191,16 @@ That is the entire vendor-facing surface.
 Append-only JSONL at `/data/audit.jsonl`. One line per successful upload:
 
 ```json
-{"ts":"2026-05-13T09:42:11Z","project":"abc123","name":"eps.war",
- "bytes":12345678,"sha256":"...","dest":"https://.../raw/eps/eps.war",
+{"ts":"2026-05-13T09:42:11Z","project":"abc123","name":"app.war",
+ "bytes":12345678,"sha256":"...","dest":"https://.../raw/acme/app.war",
  "remote":"10.x.x.x","ua":"Mozilla/...","duration_ms":842}
 ```
 
 To grep:
 
 ```bash
-oc rsh -n dev-devops-tools deploy/vendrop \
-  cat /data/audit.jsonl | jq 'select(.project=="abc123")'
+kubectl exec -n vendrop deploy/vendrop -- cat /data/audit.jsonl \
+  | jq 'select(.project=="abc123")'
 ```
 
 ### Backup
@@ -198,7 +211,7 @@ hand:
 - `/data/projects.json` — project definitions + tokens.
 - `/data/audit.jsonl`   — upload history.
 
-A nightly `oc cp` to a sidecar or external bucket is enough; both files
+A nightly `kubectl cp` to an external bucket is enough; both files
 are flat and human-readable.
 
 ### Troubleshooting
@@ -230,7 +243,7 @@ are flat and human-readable.
 
 ## Known limits
 
-- Single-replica only (file-backed state on RWO PVC). Designed for
+- Single-replica only (file-backed state on one volume). Designed for
   internal vendor handoff workloads, not as a general upload service.
 - No vendor login — token-in-URL only. Tokens are bearer credentials;
   rotate them when a vendor engagement ends.
@@ -241,8 +254,10 @@ are flat and human-readable.
 
 ## Roadmap
 
-- Mirror the image to `registry.nexus.anb.net/devops/vendrop` so we can
-  drop the `docker.io/nautilus444` bootstrap path.
 - Optional: per-project upload retention (auto-delete old uploads from
   Nexus after N days).
-- Optional: hook audit lines into Splunk / Dynatrace.
+- Optional: ship audit lines to a log pipeline.
+
+## License
+
+MIT. See `LICENSE`.

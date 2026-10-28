@@ -1,3 +1,22 @@
+{{- /*
+Non-secret settings for the selected env, from .Values.<env>.config.
+
+One lookup instead of a branch per env. The old per-env branches also emitted
+`[]` under data: for an env with `config: []` (preview, drc), which is invalid
+YAML, so those envs never rendered at all. `with` skips an empty config.
+
+NEXUS_RAW_BASE has no usable default - it is where every upload goes - so an
+empty value fails the render here rather than producing a pod that exits on
+start. An env with no config at all (replicas 0) is exempt.
+*/ -}}
+{{- $envvals := index .Values .Values.env -}}
+{{- if not $envvals -}}
+{{- fail (printf "env %q has no block in values.yaml (expected preview, dev, uat, prod or drc)" .Values.env) -}}
+{{- end -}}
+{{- $cfg := $envvals.config -}}
+{{- if and $cfg (kindIs "map" $cfg) (not (index $cfg "NEXUS_RAW_BASE")) -}}
+{{- fail (printf "%s.config.NEXUS_RAW_BASE is required, e.g. https://nexus.example.com" .Values.env) -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,24 +26,6 @@ metadata:
     argocd.argoproj.io/sync-options: Prune=false
 data:
   API_PORT: {{ .Values.API_PORT | quote }}
-  {{ if eq .Values.env "dev" }}
-  {{- with .Values.dev }}
-  {{- toYaml .config | nindent 2 }}
+  {{- with $cfg }}
+  {{- toYaml . | nindent 2 }}
   {{- end }}
-  {{ else if eq .Values.env "uat" }}
-  {{- with .Values.uat }}
-  {{- toYaml .config | nindent 2 }}
-  {{- end }}
-  {{ else if eq .Values.env "prod" }}
-  {{- with .Values.prod }}
-  {{- toYaml .config | nindent 2 }}
-  {{- end }}
-  {{ else if eq .Values.env "drc" }}
-  {{- with .Values.drc }}
-  {{- toYaml .config | nindent 2 }}
-  {{- end }}
-  {{ else if eq .Values.env "preview" }}
-  {{- with .Values.preview }}
-  {{- toYaml .config | nindent 2 }}
-  {{- end }}
-  {{ end }}

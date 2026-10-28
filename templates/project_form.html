@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% block title %}{{ 'Edit' if project else 'New' }} project — Nexus Uploader{% endblock %}
+{% block title %}{{ 'Edit' if project else 'New' }} project — vendrop{% endblock %}
 {% block nav %}
 <nav>
   <a href="{{ url_for('admin') }}">← Back to dashboard</a>
@@ -10,12 +10,13 @@
 {% if error %}<div class="error">{{ error }}</div>{% endif %}
 
 <div class="card">
-  <h2>{{ 'Edit project: ' ~ project.name if project else 'New project' }}</h2>
+  <span class="eyebrow">{{ 'Edit project' if project else 'Create project' }}</span>
+  <h2>{{ project.name if project else 'New project' }}</h2>
   <form method="post">
     <label for="name">Display name</label>
     <input id="name" name="name" type="text" required
            value="{{ project.name if project else '' }}"
-           placeholder="EPS">
+           placeholder="Acme">
 
     <label for="nexus_repo">Nexus raw repo</label>
     <input id="nexus_repo" name="nexus_repo" type="text" required
@@ -25,7 +26,7 @@
     <label for="nexus_path">Path prefix inside repo</label>
     <input id="nexus_path" name="nexus_path" type="text"
            value="{{ project.nexus_path if project else '' }}"
-           placeholder="eps/">
+           placeholder="acme/">
     <small class="muted">Vendor uploads land at <span class="mono">&lt;repo&gt;/&lt;path&gt;&lt;filename&gt;</span>. Trailing slash is added automatically. <code>..</code> is rejected.</small>
 
     <label for="allowed_extensions">Allowed extensions (comma- or space-separated, blank = any)</label>
@@ -46,30 +47,35 @@
 
 {% if project %}
 <div class="card">
-  <h2>Vendor URL</h2>
-  <p class="muted">Send this to the vendor. Anyone with the link can upload — rotate the token if it leaks.</p>
-  <p class="mono" style="word-break: break-all; background: var(--bg); padding: 10px; border-radius: 4px; border: 1px solid var(--border);">
+  <span class="eyebrow">Share with vendor</span>
+  <h2>Vendor upload URL</h2>
+  <p class="muted">Anyone with this link can upload. Rotate the token if it leaks.</p>
+  <p class="mono" style="word-break: break-all; background: var(--subtle); padding: 12px 14px; border-radius: 6px; border: 1px solid var(--border); margin-top: 8px;">
     {{ public_base }}/u/{{ project.id }}?t={{ project.token }}
   </p>
-  <form method="post" style="display: inline;">
-    <input type="hidden" name="action" value="regen_token">
-    <button type="submit" class="secondary"
-            onclick="return confirm('Regenerate token? The old vendor URL will stop working.');">
-      Regenerate token
-    </button>
-  </form>
-  <p class="muted" style="margin-top: 20px; font-size: 12px;">
-    Uploads land at: <span class="mono">{{ nexus_raw_base }}/repository/{{ project.nexus_repo }}/{{ project.nexus_path }}&lt;filename&gt;</span>
-  </p>
+  <div class="row" style="margin-top: 14px;">
+    <form method="post" style="display: inline;">
+      <input type="hidden" name="action" value="regen_token">
+      <button type="submit" class="secondary"
+              onclick="return confirm('Regenerate token? The old vendor URL will stop working.');">
+        Regenerate token
+      </button>
+    </form>
+    <span class="muted" style="font-size: 12px;">
+      Uploads land at <span class="mono">{{ nexus_raw_base }}/repository/{{ project.nexus_repo }}/{{ project.nexus_path }}&lt;filename&gt;</span>
+    </span>
+  </div>
 </div>
 
-<div class="card">
-  <h2 style="color: var(--err);">Danger zone</h2>
-  <form method="post" style="display: inline;">
+<div class="card" style="border-color: var(--err-border);">
+  <span class="eyebrow" style="color: var(--err);">Danger zone</span>
+  <h2>Delete project</h2>
+  <p class="muted">The vendor URL stops working immediately. The audit log is kept.</p>
+  <form method="post" style="display: inline; margin-top: 8px;">
     <input type="hidden" name="action" value="delete">
     <button type="submit" class="danger"
             onclick="return confirm('Delete project {{ project.name }}? The vendor URL will stop working immediately. Audit log is kept.');">
-      Delete project
+      Delete {{ project.name }}
     </button>
   </form>
 </div>

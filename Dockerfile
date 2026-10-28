@@ -1,12 +1,13 @@
 FROM python:3.11-alpine
 
-LABEL maintainer="devops@anb.com.sa"
+LABEL org.opencontainers.image.source="https://github.com/LightStein/vendrop"
+LABEL org.opencontainers.image.licenses="MIT"
 LABEL description="Vendrop - browser upload tool for vendor archives, constrained to admin-configured Nexus raw paths"
-LABEL version="1.0.0"
+LABEL version="1.0.4"
 
 WORKDIR /app
 
-# ca-certificates so TLS to Nexus works through the corporate proxy.
+# ca-certificates so TLS to Nexus verifies against the system trust store.
 RUN apk add --no-cache ca-certificates
 
 COPY requirements.txt .

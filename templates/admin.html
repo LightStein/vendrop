@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% block title %}Admin — Nexus Uploader{% endblock %}
+{% block title %}Admin — vendrop{% endblock %}
 {% block nav %}
 <nav>
   <a href="{{ url_for('admin_new') }}">+ New project</a>
@@ -8,9 +8,12 @@
 {% endblock %}
 {% block content %}
 <div class="card">
-  <h2>Projects ({{ projects|length }})</h2>
+  <span class="eyebrow">Configured projects</span>
+  <h2>Projects <span class="muted" style="font-weight: 400;">· {{ projects|length }}</span></h2>
   {% if not projects %}
-    <p class="muted">No projects yet. <a href="{{ url_for('admin_new') }}">Create one</a> to give a vendor an upload URL.</p>
+    <div class="empty">
+      No projects yet. <a href="{{ url_for('admin_new') }}">Create one</a> to give a vendor an upload URL.
+    </div>
   {% else %}
     <table>
       <thead>
@@ -45,9 +48,10 @@
 </div>
 
 <div class="card">
-  <h2>Recent uploads ({{ audit|length }})</h2>
+  <span class="eyebrow">Audit log</span>
+  <h2>Recent uploads <span class="muted" style="font-weight: 400;">· {{ audit|length }}</span></h2>
   {% if not audit %}
-    <p class="muted">No uploads yet.</p>
+    <div class="empty">No uploads yet.</div>
   {% else %}
     <table>
       <thead>
@@ -77,6 +81,7 @@
 </div>
 
 <p class="muted" style="font-size: 12px;">
-  Nexus target: <span class="mono">{{ nexus_raw_base }}</span>
+  <span class="pill dot">Nexus target</span>
+  <span class="mono">{{ nexus_raw_base }}</span>
 </p>
 {% endblock %}

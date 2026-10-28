@@ -5,48 +5,48 @@
 # Nexus raw repo paths. Admin manages projects + per-project vendor tokens;
 # vendors land on /u/<project>?t=<token> and drag archives in.
 #
-# Apply: oc apply -f deployment.yaml -n devops-tools
+# Standalone manifest, for clusters without Helm or GitOps. The Helm chart in
+# chart/ is the fuller option. Before applying, fill in every value marked
+# CHANGE-ME (Nexus URL, Secret values, storage class), then:
+#
+#   kubectl apply -f deployment.yaml
+#
+# The Route at the bottom is OpenShift-only; on plain Kubernetes delete it and
+# put an Ingress in front of the Service instead.
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: devops-tools
-  labels:
-    team: devops
+  name: vendrop
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: vendrop-secrets
-  namespace: devops-tools
+  namespace: vendrop
 type: Opaque
 stringData:
   NEXUS_USER: admin
-  NEXUS_PASS: ""              # UPDATE before apply
+  NEXUS_PASS: ""              # CHANGE-ME: Nexus account that may write the raw repos
   ADMIN_USER: admin
-  ADMIN_PASS: ""              # UPDATE — admin login password
-  SECRET_KEY: ""              # generate with: openssl rand -hex 32
+  ADMIN_PASS: ""              # CHANGE-ME: admin UI password
+  SECRET_KEY: ""              # CHANGE-ME: openssl rand -hex 32. Unset = everyone logged out on restart
 ---
 # PVC so project config + audit log survive pod restarts.
 #
-# storageClassName is set explicitly and must stay that way. Without it the
-# claim binds to the cluster default, which on the ANB clusters is `thin` -
-# the in-tree vSphere provisioner. That is the same class behind the nine-day
-# stuck detach in July 2026, where vCenter would not release the volume and
-# the pod could not be rescheduled to another node.
+# Set storageClassName explicitly. Left out, the claim binds to the cluster
+# default, which is often an in-tree cloud provisioner that has to detach the
+# volume before the pod can move to another node - and a detach that hangs
+# pins the pod indefinitely. An RWX class (CephFS, NFS, ...) needs no detach.
+# vendrop still runs one replica; RWX is about rescheduling, not scale.
 #
-# CephFS with RWX needs no detach at all, so a node going away costs nothing.
-# vendrop still runs a single replica; RWX is about rescheduling, not scale.
-#
-# NOTE: storageClassName and accessModes are immutable on an existing PVC.
-# An already-deployed vendrop cannot be patched onto the new class - the data
-# has to be copied to a new claim. See MIGRATION-cephfs.md in this directory
-# before applying this file to a namespace where vendrop already runs.
+# storageClassName and accessModes cannot be changed on an existing claim, so
+# choose before first apply.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: vendrop-data-cephfs
-  namespace: devops-tools
+  name: vendrop-data
+  namespace: vendrop
   annotations:
     # Keep the volume if this manifest is ever pruned or reapplied. The vendor
     # upload tokens live in projects.json on here - losing it invalidates every
@@ -55,7 +55,7 @@ metadata:
     helm.sh/resource-policy: keep
 spec:
   accessModes: [ReadWriteMany]
-  storageClassName: ocs-storagecluster-cephfs
+  storageClassName: CHANGE-ME     # e.g. ocs-storagecluster-cephfs, nfs-client
   resources:
     requests:
       storage: 1Gi
@@ -64,19 +64,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vendrop
-  namespace: devops-tools
+  namespace: vendrop
   labels:
     app: vendrop
-    team: devops
 spec:
-  # Recreate, not RollingUpdate. vendrop keeps projects.json and audit.jsonl
-  # on the volume; overlapping old and new pods would have two writers on the
-  # same files.
+  replicas: 1            # single replica: projects and audit log are files
+  # Recreate, not RollingUpdate. Overlapping old and new pods would be two
+  # writers on the same projects.json and audit.jsonl.
   strategy:
     type: Recreate
-  replicas: 1            # single-replica: file-backed projects + audit log
-  strategy:
-    type: Recreate       # avoid two replicas racing on the JSON files
   selector:
     matchLabels:
       app: vendrop
@@ -87,15 +83,15 @@ spec:
     spec:
       containers:
         - name: app
-          image: registry.nexus.anb.net/devops/vendrop:v1.0.0
+          image: docker.io/nautilus444/vendrop:v1.0.4
           ports:
             - containerPort: 8080
               name: http
           env:
             - name: NEXUS_RAW_BASE
-              value: "https://nxrm-operator-certified-nexus.apps.ocpdev.anb.net"
+              value: "CHANGE-ME"    # e.g. https://nexus.example.com
             - name: NEXUS_VERIFY_TLS
-              value: "false"        # internal CA, mirror image-copier behaviour
+              value: "true"         # "false" only for a self-signed Nexus
             - name: DATA_DIR
               value: "/data"
             - name: DEFAULT_MAX_MB
@@ -138,13 +134,13 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: vendrop-data-cephfs
+            claimName: vendrop-data
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: vendrop
-  namespace: devops-tools
+  namespace: vendrop
   labels:
     app: vendrop
 spec:
@@ -155,13 +151,13 @@ spec:
       targetPort: 8080
       name: http
 ---
-# Public Route — edge-terminated TLS via the cluster's wildcard cert.
+# OpenShift Route - edge-terminated TLS via the cluster's wildcard cert.
 # Auth is handled inside the app (admin session for /admin, vendor token in URL for /u).
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: vendrop
-  namespace: devops-tools
+  namespace: vendrop
 spec:
   to:
     kind: Service
